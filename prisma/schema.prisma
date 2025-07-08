@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Provider {
+  DEFAULT
+  GOOGLE
+}
+
+enum AccountStatus {
+  PUBLIC
+  PRIVATE
+}
+
+model User {
+  id                     String          @id @default(uuid())
+  email                  String          @unique
+  username               String?         @unique
+  name                   String
+  phone                  String?
+  password               String?
+  provider               Provider        @default(DEFAULT)
+  isVerified             Boolean         @default(false)
+  is2FAEnabled           Boolean         @default(false)
+  isDeleted              Boolean         @default(false)
+  deletedAt              DateTime?
+  otp                    String?
+  otpExpiry              DateTime?
+  bio                    String?
+  pfp                    String?
+  coverImage             String?
+  accountStatus          AccountStatus   @default(PRIVATE)
+  posts                  Post[]          @relation("UserPosts")
+  stories                Story[]
+  comments               Comment[]
+  likes                  Like[]
+  followers              Follower[]      @relation("UserFollowers")
+  following              Follower[]      @relation("UserFollowing")
+  chats                  ChatMember[]
+  messages               Message[]
+  notifications          Notification[]
+  sentFollowRequests     FollowRequest[] @relation("SentFollowRequests")
+  receivedFollowRequests FollowRequest[] @relation("ReceivedFollowRequests")
+  blocked                Block[]         @relation("blocked")
+  blockers               Block[]         @relation("blockers")
+  createdAt              DateTime        @default(now())
+  otpAttempts  Int      @default(0)
+  updatedAt              DateTime        @updatedAt
+}
+
+model Post {
+  id         String    @id @default(uuid())
+  caption    String?
+  images     Image[]
+  videoUrl   String?
+  author     User      @relation("UserPosts", fields: [authorId], references: [id])
+  authorId   String
+  isActive   Boolean   @default(false)
+  isArchived Boolean   @default(false)
+  comments   Comment[]
+  likes      Like[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Image {
+  id     String  @id @default(uuid())
+  imgurl String
+  Post   Post?   @relation(fields: [postId], references: [id])
+  postId String?
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  text      String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Follower {
+  id          String   @id @default(uuid())
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id])
+  followerId  String
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id])
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+model FollowRequest {
+  id         String              @id @default(uuid())
+  sender     User                @relation("SentFollowRequests", fields: [senderId], references: [id])
+  senderId   String
+  receiver   User                @relation("ReceivedFollowRequests", fields: [receiverId], references: [id])
+  receiverId String
+  status     FollowRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([senderId, receiverId])
+}
+
+enum FollowRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Story {
+  id            String      @id @default(uuid())
+  caption       String?
+  imageUrl      String?
+  user          User        @relation(fields: [userId], references: [id])
+  userId        String
+  isHighlighted Boolean     @default(false)
+  expiresAt     DateTime
+  createdAt     DateTime    @default(now())
+  Highlights    Highlight[]
+}
+
+model Chat {
+  id        String       @id @default(uuid())
+  members   ChatMember[]
+  messages  Message[]
+  createdAt DateTime     @default(now())
+}
+
+model ChatMember {
+  id     String @id @default(uuid())
+  chat   Chat   @relation(fields: [chatId], references: [id])
+  chatId String
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@unique([chatId, userId])
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  chat      Chat      @relation(fields: [chatId], references: [id])
+  chatId    String
+  sender    User      @relation(fields: [senderId], references: [id])
+  senderId  String
+  content   String
+  image     String?
+  editedAt  DateTime?
+  seen      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blocker   User     @relation("blockers", fields: [blockerId], references: [id])
+  blockedId String
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([blockerId, blockedId])
+}
+
+model Highlight {
+  id      String @id @default(uuid())
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id])
+}
